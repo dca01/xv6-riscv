@@ -61,7 +61,7 @@ $ yosoytupadre
 
 ## 5. Conclusión
 
--No se presentaron mayores problemas en la instalacion.
+-No se presentaron mayores problemas en el desarollo de la tarea.
 
 -Se implementaron `getppid()` y `getancestor(n)` en xv6 y se probaron con `ppid` y `yosoytupadre` (incluidos en `UPROGS`). El comportamiento coincide con lo solicitado, incluyendo el retorno `-1` cuando no existe el ancestro. Además, se comprende el flujo de una syscall en xv6 (user.h/usys.pl → syscall.h/syscall.c → sysproc.c) y la relación padre–hijo.
 
