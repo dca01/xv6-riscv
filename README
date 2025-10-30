@@ -80,4 +80,4 @@ Tuning operacional: valores por defecto (tickets=100) funcionan, pero distintas 
 
 ## 5. Ejecución y resultados
 
-![Resultados demo](images/demo_run.png)
+![Resultados demo](images/demo.png)
