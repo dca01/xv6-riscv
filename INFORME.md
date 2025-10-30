@@ -1,67 +1,107 @@
-Informe Tarea 1 - Sistemas Operativos 
+Informe Tarea 2 - Sistemas Operativos 
 
-Daniel Cortes Anjel dc_t1 29/9/25
+Daniel Cortes Anjel grupoM_t2 30/10/25
 
 Entorno: Windows 11 + WSL (Ubuntu 24.04), QEMU, toolchain RISC-V
 
-## 1. Alcance
-Se añadieron dos llamadas al sistema y se validaron con programas en espacio de usuario:
-- `getppid()` — devuelve el PID del proceso padre; si no hay padre, retorna `-1`.
-- `getancestor(int n)` — devuelve el PID del ancestro n del proceso actual. Para n=0 se obtiene el propio PID; si el ancestro solicitado no existe o n<0, retorna `-1`.
+## 1. Funcionamiento y lógica de la implementación
+Se reemplazó el Round-Robin por Lottery Scheduling. Cada proceso mantiene un campo tickets (>=1) y un contador cpu_slices (veces elegido). En cada iteración del scheduler():
 
----
+Se recorre la tabla de procesos y se calcula total=tickets de todos los RUNNABLE (forzando tickets>=1 por robustez).
 
-## 2. Implementacion
-- `getppid()`: se consulta `myproc()->parent->pid`. Si `parent` es nulo, se retorna `-1`.
-- `getancestor(n)`: se extrae `n` con `argint(0,&n)`, se valida `n>=0` y se asciende por `parent` n veces. Si durante el ascenso el puntero queda en nulo, se retorna `-1`; en caso contrario se retorna `p->pid`.
+-Se genera r en [1..total] mediante un LCG sencillo (lcg_rand).
 
----
+-Se recorre nuevamente acumulando tickets hasta que acc >= r; ese proceso es el winner.
 
-## 3. Cambios en el código
-- `kernel/syscall.h`  
-  `#define SYS_getppid 22`  
-  `#define SYS_getancestor 23`
-- `kernel/sysproc.c`  
-  Implementaciones `sys_getppid()` y `sys_getancestor()` con la lógica anterior.
-- `kernel/syscall.c`  
-  Declaraciones `extern` y registros en la tabla `syscalls[]` para los IDs 22 y 23.
-- `user/user.h`  
-  Prototipos `int getppid(void);` y `int getancestor(int n);`
-- `user/usys.pl`  
-  Entradas `entry("getppid");` y `entry("getancestor");`
-- `user/ppid.c`  
-  Prueba mínima de `getppid()`.
-- `user/yosoytupadre.c`  
-  Pruebas de `getppid()` y `getancestor(n)` incluyendo creación de hijo con `fork()`.
-- `Makefile`  
-  Inclusión en `UPROGS` de `_ppid` y `_yosoytupadre`.
+-Con el lock del ganador tomado, se marca RUNNING, se hace cpu_slices++ y se ejecuta con swtch.
 
----
+-Si total==0, se deshabilitan interrupciones y se ejecuta wfi para dormir hasta la siguiente interrupción, luego continúa el bucle.
 
-## 4. Ejecución y resultados
+Evidencia (demo): programa user/demo.c crea N=10 hijos con settickets(50*(i+1)). El kernel imprime en kexit() las métricas pid/tickets/slices. Se observa la tendencia tickets slices (proporcionalidad en promedio).
 
-### Confirmacion
-sh
+## 2.Explicación de las modificaciones realizadas (archivos y cambios clave)
+
+- kernel/proc.h :
+
+int tickets; (por defecto 100, mínimo 1)
+
+int cpu_slices; (conteo de elecciones)
+
+uint64 ctime; uint64 etime; (marcas de creación/termino)
+
+- kernel/proc.c :
+
+allocproc(): inicializa tickets=100, cpu_slices=0, ctime=ticks, etime=0.
+
+kexit(): asigna etime=ticks y (para pruebas) imprime:
+printf("KERNEL: pid=%d tickets=%d slices=%d\n", ...).
+
+scheduler(): lógica de lotería: sumatoria → sorteo → acumulado → ganador (con cpu_slices++).
+
+RNG simple: static uint lcg_rand(void) y semilla estática.
+
+- Syscall settickets(int n) :
+
+kernel/syscall.h: #define SYS_settickets <ID>
+
+kernel/syscall.c: extern uint64 sys_settickets(void); y entrada en syscalls[].
+
+kernel/sysproc.c: implementación sys_settickets: lee n con argint(0,&n), si n<1; n=1, y asigna a myproc()->tickets.
+
+user/user.h: prototipo int settickets(int n);
+
+user/usys.pl: entry("settickets");
+
+- user/demo.c :
+
+Crea 10 procesos, llama settickets(50*(i+1)), ejecuta carga CPU, el padre espera a todos y reporta termino
+
+- Makefile :
+
+Agregado _demo a UPROGS
+
+## 3.Dificultades encontradas y soluciones implementadas
+
+No se presentaron mayores problemas en el desarollo de la tarea.
+
+## 4.Posibles problemas del Lottery Scheduling
+
+Varianza estocástica: en ventanas pequeñas, un proceso con menos tickets podría ser elegido varias veces seguidas por azar.
+
+Sin garantías duras de latencia/plazos: el esquema es probabilístico; no asegura deadlines. Para cargas de tiempo real, requiere complementos (p. ej., prioridades o cuotas).
+
+Dominancia por tickets altos: procesos con muchos tickets pueden acaparar CPU; si no hay política institucional para otorgar tickets, podria introducir sesgos.
+
+No distingue I/O-bound vs CPU-bound: sin mecanismos adicionales, un CPU-bound con más tickets puede afectar la responsividad de I/O-bound.
+
+Semilla/PRNG simples: un generador pobre puede degradar la distribución
+
+Tuning operacional: valores por defecto (tickets=100) funcionan, pero distintas cargas pueden requerir ajustes o aging para evitar inanición.
+
+## 5. Ejecución y resultados
+
 make clean && make qemu
-$ ppid
-PID=3 PPID=2
+$ demo
+demo: creando 10 hijos con distintos tickets (50..500)
+KERNEL: pid=12 tickets=450 slices=4
+[padre] hijo pid=12KERNEL: pid=9 tickets=300 slices=4
+KERNEL: pid=10 tickets=350 slices=5
+ termino (status=0)
+[padre] hijo pid=9 termino (statKERNEL: pid=13 tickets=500 slices=5
+KERNEL: pid=7 tickets=200 slices=4
+KERNEL: pid=8 tickets=250 slices=6
+us=0)
+[padre] hijo pid=7 termino (status=0)
+[padre] hijo pid=8 termino (status=0)
+[padre] hijo pid=10 termino (status=0)
+[padre] hijo pid=13 termino (status=0)
+KERNEL: pid=5 tickets=100 slices=6
+[padre] hijo pid=5 termino (status=0)
+KERNEL: pid=4 tickets=50 slices=4
+[KERNEL: pid=6 tickets=150 slices=5
+padre] hijo pid=4 termino (status=0KERNEL): pid=11 tickets=400 slices=5
 
-$ yosoytupadre
-[padre] PID=3, PPID=2
-[padre] ancestor(0)=3
-[padre] ancestor(1)=2
-[padre] ancestor(2)=1
-[hijo]  PID=4, PPID=3
-[hijo]  ancestor(0)=4
-[hijo]  ancestor(1)=3
-[hijo]  ancestor(2)=2
-[hijo]  ancestor(10)=-1
-
----
-
-## 5. Conclusión
-
--No se presentaron mayores problemas en el desarollo de la tarea.
-
--Se implementaron `getppid()` y `getancestor(n)` en xv6 y se probaron con `ppid` y `yosoytupadre` (incluidos en `UPROGS`). El comportamiento coincide con lo solicitado, incluyendo el retorno `-1` cuando no existe el ancestro. Además, se comprende el flujo de una syscall en xv6 (user.h/usys.pl → syscall.h/syscall.c → sysproc.c) y la relación padre–hijo.
-
+[padre] hijo pid=6 termino (status=0)
+[padre] hijo pid=11 termino (status=0)
+demo: fin
+KERNEL: pid=3 tickets=100 slices=15
