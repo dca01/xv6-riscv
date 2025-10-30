@@ -44,4 +44,6 @@ entry("pause");
 entry("uptime");
 entry("getppid");
 entry("getancestor");
+entry("settickets");
+
 

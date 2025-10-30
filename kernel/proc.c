@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+extern uint ticks; 
 
 struct cpu cpus[NCPU];
 
@@ -124,6 +125,11 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+
+  p->tickets = 100;   //default
+  p->cpu_slices = 0;  //contador
+  p->ctime = ticks;   //marca creacion ticks
+  p->etime = 0;       //aun no termina 
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -353,6 +359,8 @@ kexit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
+  p->etime = (uint64)ticks;   // marca de termino en ticks
+  printf("KERNEL: pid=%d tickets=%d slices=%d\n", p->pid, p->tickets, p->cpu_slices);
   p->state = ZOMBIE;
 
   release(&wait_lock);
@@ -418,12 +426,14 @@ kwait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+
+static uint rseed = 123456789;
+static uint lcg_rand(void){ rseed = rseed * 1103515245 + 12345; return rseed; }
+
 void
 scheduler(void)
 {
-  struct proc *p;
   struct cpu *c = mycpu();
-
   c->proc = 0;
   for(;;){
     // The most recent process to run may have had interrupts
@@ -432,30 +442,48 @@ scheduler(void)
     // to avoid a possible race between an interrupt
     // and wfi.
     intr_on();
-    intr_off();
 
-    int found = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
+    // 1) sumar tickets
+    int total = 0;
+    for (struct proc *p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
+      if (p->state == RUNNABLE) {
+        if (p->tickets < 1) p->tickets = 1;
+        total += p->tickets;
       }
       release(&p->lock);
     }
-    if(found == 0) {
-      // nothing to run; stop running on this core until an interrupt.
-      asm volatile("wfi");
+
+    if (total == 0) {
+      intr_off();
+      asm volatile("wfi");   // o simplemente: continue;
+      intr_on();
+      continue;
     }
+
+    // 2) sorteo
+    uint r = (lcg_rand() % total) + 1;
+
+    // 3) ganador (se mantiene lock)
+    struct proc *winner = 0;
+    int acc = 0;
+    for (struct proc *p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if (p->state == RUNNABLE) {
+        acc += p->tickets;
+        if (acc >= r) { winner = p; break; }
+      }
+      release(&p->lock);
+    }
+    if (!winner) continue;
+
+    // 4) ejecutar
+    winner->state = RUNNING;
+    winner->cpu_slices++;
+    c->proc = winner;
+    swtch(&c->context, &winner->context);
+    c->proc = 0;
+    release(&winner->lock);
   }
 }
 
