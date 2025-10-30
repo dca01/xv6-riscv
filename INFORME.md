@@ -80,28 +80,4 @@ Tuning operacional: valores por defecto (tickets=100) funcionan, pero distintas 
 
 ## 5. Ejecución y resultados
 
-make clean && make qemu
-$ demo
-demo: creando 10 hijos con distintos tickets (50..500)
-KERNEL: pid=12 tickets=450 slices=4
-[padre] hijo pid=12KERNEL: pid=9 tickets=300 slices=4
-KERNEL: pid=10 tickets=350 slices=5
- termino (status=0)
-[padre] hijo pid=9 termino (statKERNEL: pid=13 tickets=500 slices=5
-KERNEL: pid=7 tickets=200 slices=4
-KERNEL: pid=8 tickets=250 slices=6
-us=0)
-[padre] hijo pid=7 termino (status=0)
-[padre] hijo pid=8 termino (status=0)
-[padre] hijo pid=10 termino (status=0)
-[padre] hijo pid=13 termino (status=0)
-KERNEL: pid=5 tickets=100 slices=6
-[padre] hijo pid=5 termino (status=0)
-KERNEL: pid=4 tickets=50 slices=4
-[KERNEL: pid=6 tickets=150 slices=5
-padre] hijo pid=4 termino (status=0KERNEL): pid=11 tickets=400 slices=5
-
-[padre] hijo pid=6 termino (status=0)
-[padre] hijo pid=11 termino (status=0)
-demo: fin
-KERNEL: pid=3 tickets=100 slices=15
+![Resultados demo](images/demo_run.png)
