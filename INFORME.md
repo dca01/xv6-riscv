@@ -64,4 +64,4 @@ El enunciado habla de memoria “solo escritura”, pero al pedir solo limpiar P
 
 ## 4.Ejecución y resultados 
 
-![Resultados](images/resultados1.png)
+![Resultados](images/imagen.png)
