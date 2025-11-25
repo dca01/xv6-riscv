@@ -63,5 +63,13 @@ No pertenece a usuario (!PTE_U).
 El enunciado habla de memoria “solo escritura”, pero al pedir solo limpiar PTE_R manteniendo W/X/U/V, en RISC-V una PTE con W=1 y R=0 es inválida; por eso no se puede asegurar escritura sin lectura solo con ese cambio. La implementación cumple estrictamente con modificar únicamente PTE_R.
 
 ## 4.Ejecución y resultados 
-
 ![Resultados](images/imagen.png)
+
+$ rdprotect_test
+usertrap(): unexpected scause 0xd pid=4
+            sepc=0x32 stval=0x4000
+KERNEL: pid=4 tickets=100 slices=1
+Hijo terminó con status=-1 (esperado: killed)
+Lectura tras unprotect: A (esperado A)
+KERNEL: pid=3 tickets=100 slices=7
+
