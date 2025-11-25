@@ -2,7 +2,7 @@ Informe Tarea 3 - Sistemas Operativos
 
 Daniel Cortes Anjel 30/10/25
 
-Entorno: Windows 11 + WSL (Ubuntu 24.04), QEMU, toolchain RISC-V
+Entorno:Windows 11 + WSL (Ubuntu 24.04), QEMU, toolchain RISC-V
 
 ## 1. Funcionamiento y lógica de la implementación
 
