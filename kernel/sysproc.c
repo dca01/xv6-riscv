@@ -146,3 +146,61 @@ sys_settickets(void)
   myproc()->tickets = n;
   return 0;
 }
+
+uint64
+sys_mrdprotect(void)
+{
+  uint64 addr;
+  int len;
+  struct proc *p = myproc();
+
+  argaddr(0, &addr);
+  argint(1, &len);
+
+  if(len <= 0) return -1;
+  if(addr % PGSIZE != 0) return -1;
+
+  uint64 end = addr + (uint64)len * PGSIZE;
+  if(end > p->sz) return -1;//rango fuera del espacio de usuario del proceso
+
+  for(uint64 va = addr; va < end; va += PGSIZE){
+    pte_t *pte = walk(p->pagetable, va, 0);
+    if(pte == 0) return -1;
+    if((*pte & PTE_V) == 0) return -1;
+    if((*pte & PTE_U) == 0) return -1;
+
+    *pte &= ~PTE_R;//se quita lectura
+  }
+
+  sfence_vma();//flush TLB
+  return 0;
+}
+
+uint64
+sys_munrdprotect(void)
+{
+  uint64 addr;
+  int len;
+  struct proc *p = myproc();
+
+  argaddr(0, &addr);
+  argint(1, &len);
+
+  if(len <= 0) return -1;
+  if(addr % PGSIZE != 0) return -1;
+
+  uint64 end = addr + (uint64)len * PGSIZE;
+  if(end > p->sz) return -1;
+
+  for(uint64 va = addr; va < end; va += PGSIZE){
+    pte_t *pte = walk(p->pagetable, va, 0);
+    if(pte == 0) return -1;
+    if((*pte & PTE_V) == 0) return -1;
+    if((*pte & PTE_U) == 0) return -1;
+
+    *pte |= PTE_R;//se devuelve lectura
+  }
+
+  sfence_vma();
+  return 0;
+}

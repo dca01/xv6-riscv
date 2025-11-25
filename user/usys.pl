@@ -45,5 +45,6 @@ entry("uptime");
 entry("getppid");
 entry("getancestor");
 entry("settickets");
-
+entry("mrdprotect");
+entry("munrdprotect");
 
